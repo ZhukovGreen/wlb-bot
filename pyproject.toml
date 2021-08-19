@@ -85,6 +85,11 @@ quiet = false
 whitelist-regex = []
 color = true
 
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.1"
+tag_format = "$version"
+
 [tool.poetry]
 name = "wlb-bot"
 version = "1.0"
@@ -114,11 +119,11 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
+commitizen = "^2.18.0"
 
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "^5.5"}
 neovim = "^0.3.1"
-
 
 [build-system]
 requires = ["poetry>=1.0.0"]
