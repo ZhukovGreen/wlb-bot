@@ -120,10 +120,16 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.9"
 commitizen = "^2.18.0"
+aiogram = "^2.14.3"
+loguru = "^0.5.3"
+envparse = "^0.2.0"
+gcsa = "^1.2.0"
 
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "^5.5"}
 neovim = "^0.3.1"
+pdbpp = "^0.10.3"
+pytest = "^6.2.4"
 
 [build-system]
 requires = ["poetry>=1.0.0"]
