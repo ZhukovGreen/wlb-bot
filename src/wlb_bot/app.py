@@ -1,4 +1,4 @@
-import datetime
+import pendulum
 
 from aiogram import Bot, Dispatcher, types
 from envparse import env
@@ -6,8 +6,11 @@ from gcsa.google_calendar import GoogleCalendar
 from google.oauth2 import service_account
 
 
+CALENDAR_KEY = "calendar"
+
+
 def auth_to_gcal():
-    gc = GoogleCalendar(
+    return GoogleCalendar(
         calendar=env.str("WLB_CALENDAR_ID"),
         credentials=service_account.Credentials.from_service_account_info(
             {
@@ -26,17 +29,26 @@ def auth_to_gcal():
             }
         ),
     )
-    events = list(
-        gc.get_events(
-            time_min=datetime.date(2021, 8, 19),
-            time_max=datetime.date(2021, 8, 19),
-        )
-    )
-    events
 
 
 async def start(message: types.Message):
+    message.bot[CALENDAR_KEY] = auth_to_gcal()
     await message.answer("Registering your gcal")
+
+
+async def get_weekly_data(message: types.Message):
+    gc: GoogleCalendar = message.bot[CALENDAR_KEY]
+    today = pendulum.now()
+    start_of_week = today.start_of("week")
+    end_of_week = today.end_of("week")
+    await message.answer(
+        "\n".join(
+            repr(event)
+            for event in gc.get_events(
+                time_min=start_of_week, time_max=end_of_week
+            )
+        )
+    )
 
 
 def build_bot() -> Dispatcher:
@@ -44,4 +56,5 @@ def build_bot() -> Dispatcher:
     dp = Dispatcher(bot=bot)
 
     dp.register_message_handler(start, commands=("start",))
+    dp.register_message_handler(get_weekly_data, commands=("week-data",))
     return dp

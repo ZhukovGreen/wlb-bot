@@ -124,12 +124,14 @@ aiogram = "^2.14.3"
 loguru = "^0.5.3"
 envparse = "^0.2.0"
 gcsa = "^1.2.0"
+pendulum = "^2.1.2"
 
 [tool.poetry.dev-dependencies]
 coverage = {extras = ["toml"], version = "^5.5"}
 neovim = "^0.3.1"
 pdbpp = "^0.10.3"
 pytest = "^6.2.4"
+pytest-asyncio = "^0.15.1"
 
 [build-system]
 requires = ["poetry>=1.0.0"]
