@@ -9,7 +9,10 @@ env.read_envfile(".env")
 
 
 class InterceptHandler(logging.Handler):
+    """Logger handler to intercept standard logger messages."""
+
     def emit(self, record):
+        """Reemit the message via loguru.logger."""
         # Get corresponding Loguru level if it exists
         try:
             level = logger.level(record.levelname).name

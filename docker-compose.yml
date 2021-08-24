@@ -1,0 +1,11 @@
+services:
+  app:
+    env_file: .env
+    build:
+      context: .
+      cache_from:
+        - &img_tag aiohttp-cache:latest
+    image: *img_tag
+    volumes:
+      - .:/aiohttp-cache
+    command: python -m wlb_bot

@@ -144,7 +144,7 @@ dmypy.json
 /cdk.context.json
 
 # DotENV files
-.env.*
+.env
 !.env.test
 
 # Makefile target
