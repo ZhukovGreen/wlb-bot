@@ -16,7 +16,7 @@ ENV PATH "/root/.local/bin:$PATH"
 COPY ./pyproject.toml .
 COPY ./poetry.lock .
 
-RUN poetry install --no-root
+RUN poetry install --no-root --no-dev
 
 
 FROM base as target
