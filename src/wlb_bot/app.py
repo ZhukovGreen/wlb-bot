@@ -94,16 +94,19 @@ async def start(message: types.Message):
 
     If user is admin, then the command authenticate the google calendar.
     """
+    keyboard_markup = types.ReplyKeyboardMarkup()
+    keyboard_markup.row(types.KeyboardButton("/week-data"))
     if message.from_user.username == env.str("WLB_ADMIN_USERNAME"):
         message.bot[CALENDAR_KEY] = await auth_to_gcal()
-        keyboard_markup = types.ReplyKeyboardMarkup(row_width=3)
-        keyboard_markup.row(types.KeyboardButton("/week-data"))
         await message.answer(
             "Google calendar authenticated.",
             reply_markup=keyboard_markup,
         )
     else:
-        await message.answer("You are not authenticated to start this bot")
+        await message.answer(
+            "You are not authenticated to start this bot",
+            reply_markup=keyboard_markup,
+        )
 
 
 async def get_weekly_data(message: types.Message):
@@ -115,11 +118,11 @@ async def get_weekly_data(message: types.Message):
         today = pendulum.now()
         underwork, overwork = await get_balance(today, gc)
 
+        text = f"Week {today.start_of('week').to_date_string()} - {today.end_of('week').to_date_string()}:\n"
         await message.answer(
-            f"Week {today.start_of('week').to_date_string()} - {today.end_of('week').to_date_string()}:\n"
-            + ("Overworked: " + str(overwork - underwork))
+            (text + "Overworked: " + str(overwork - underwork))
             if overwork >= underwork
-            else ("Underworked: " + str(underwork - overwork)),
+            else (text + "Underworked: " + str(underwork - overwork)),
         )
 
 
