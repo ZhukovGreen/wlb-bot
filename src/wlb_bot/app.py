@@ -17,7 +17,7 @@ UNDERWORK_EVENT_KEY = env.str("WLB_UNDERWORK_EVENT_NAME")
 OVERWORK_EVENT_KEY = env.str("WLB_OVERWORK_EVENT_NAME")
 
 
-async def auth_to_gcal():
+def auth_to_gcal():
     """Create GoogleCalendar instance."""
     return GoogleCalendar(
         calendar=env.str("WLB_CALENDAR_ID"),
@@ -96,17 +96,11 @@ async def start(message: types.Message):
     """
     keyboard_markup = types.ReplyKeyboardMarkup()
     keyboard_markup.row(types.KeyboardButton("/week-data"))
-    if message.from_user.username == env.str("WLB_ADMIN_USERNAME"):
-        message.bot[CALENDAR_KEY] = await auth_to_gcal()
-        await message.answer(
-            "Google calendar authenticated.",
-            reply_markup=keyboard_markup,
-        )
-    else:
-        await message.answer(
-            "You are not authenticated to start this bot",
-            reply_markup=keyboard_markup,
-        )
+    keyboard_markup.row(types.KeyboardButton("/when-go-home"))
+    await message.answer(
+        "Welcome to work life balance bot!",
+        reply_markup=keyboard_markup,
+    )
 
 
 async def get_weekly_data(message: types.Message):
@@ -126,11 +120,35 @@ async def get_weekly_data(message: types.Message):
         )
 
 
-def build_bot() -> Dispatcher:
+async def get_end_of_working_day(message: types.Message):
+    try:
+        gc: GoogleCalendar = message.bot[CALENDAR_KEY]
+    except KeyError:
+        await message.answer("Bot has not been started. Type: /start first.")
+    else:
+        today = pendulum.now()
+        day_events = gc.get_events(
+            time_min=today.start_of("day"),
+            time_max=today.end_of("day"),
+            single_events=True,
+            order_by="startTime",
+        )
+        *_, last_overwork = filter(is_overwork_event, day_events)
+        await message.answer(
+            f"Go home scheduled on {last_overwork.start.hour}:{last_overwork.start.minute}"
+        )
+
+
+def build_dispatcher() -> Dispatcher:
     """Build bot and dispatcher."""
     bot = Bot(token=env.str("WLB_BOT_API_TOKEN"))
     dp = Dispatcher(bot=bot)
 
+    bot[CALENDAR_KEY] = auth_to_gcal()
+
     dp.register_message_handler(start, commands=("start",))
     dp.register_message_handler(get_weekly_data, commands=("week-data",))
+    dp.register_message_handler(
+        get_end_of_working_day, commands=("when-go-home",)
+    )
     return dp
