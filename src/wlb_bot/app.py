@@ -127,15 +127,22 @@ async def get_end_of_working_day(message: types.Message):
         await message.answer("Bot has not been started. Type: /start first.")
     else:
         today = pendulum.now()
-        day_events = gc.get_events(
-            time_min=today.start_of("day"),
-            time_max=today.end_of("day"),
-            single_events=True,
-            order_by="startTime",
+        day_events = tuple(
+            gc.get_events(
+                time_min=today.start_of("day"),
+                time_max=today.end_of("day"),
+                single_events=True,
+                order_by="startTime",
+            )
         )
+        *_, last_underwork = filter(is_underwork_event, day_events)
         *_, last_overwork = filter(is_overwork_event, day_events)
+        if get_event_length(last_overwork) == datetime.timedelta(0):
+            leave_event = last_underwork.start
+        else:
+            leave_event = last_overwork.end
         await message.answer(
-            f"Go home scheduled on {last_overwork.start.hour}:{last_overwork.start.minute}"
+            f"Go home scheduled on {leave_event.hour}:{leave_event.minute}"
         )
 
 
