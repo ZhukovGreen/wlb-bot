@@ -132,6 +132,7 @@ neovim = "^0.3.1"
 pdbpp = "^0.10.3"
 pytest = "^6.2.4"
 pytest-asyncio = "^0.15.1"
+pytest-cov = "^2.12.1"
 
 [build-system]
 requires = ["poetry>=1.0.0"]

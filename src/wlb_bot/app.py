@@ -1,10 +1,12 @@
 import datetime
+import re
 
-from typing import Tuple
+from typing import Iterable, Optional, Tuple
 
 import pendulum
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import ParseMode
 from envparse import env
 from gcsa.event import Event
 from gcsa.google_calendar import GoogleCalendar
@@ -15,9 +17,19 @@ from pendulum import DateTime
 CALENDAR_KEY = "calendar"
 UNDERWORK_EVENT_KEY = env.str("WLB_UNDERWORK_EVENT_NAME")
 OVERWORK_EVENT_KEY = env.str("WLB_OVERWORK_EVENT_NAME")
+WEEK_DETAILS_KEYS = tuple(
+    re.compile(key) for key in env.list("WLB_WEEK_DETAILS_KEYS")
+)
 
 
-def auth_to_gcal():
+async def get_gcal(message: types.Message) -> GoogleCalendar:
+    try:
+        return message.bot[CALENDAR_KEY]
+    except KeyError:
+        await message.answer("Bot has not been started. Type: /start first.")
+
+
+def auth_to_gcal() -> GoogleCalendar:
     """Create GoogleCalendar instance."""
     return GoogleCalendar(
         calendar=env.str("WLB_CALENDAR_ID"),
@@ -97,6 +109,7 @@ async def start(message: types.Message):
     keyboard_markup = types.ReplyKeyboardMarkup()
     keyboard_markup.row(types.KeyboardButton("/week-data"))
     keyboard_markup.row(types.KeyboardButton("/when-go-home"))
+    keyboard_markup.row(types.KeyboardButton("/week-details"))
     await message.answer(
         "Welcome to work life balance bot!",
         reply_markup=keyboard_markup,
@@ -104,46 +117,85 @@ async def start(message: types.Message):
 
 
 async def get_weekly_data(message: types.Message):
-    try:
-        gc: GoogleCalendar = message.bot[CALENDAR_KEY]
-    except KeyError:
-        await message.answer("Bot has not been started. Type: /start first.")
-    else:
-        today = pendulum.now()
-        underwork, overwork = await get_balance(today, gc)
+    gc = await get_gcal(message)
+    today = pendulum.now()
+    underwork, overwork = await get_balance(today, gc)
 
-        text = f"Week {today.start_of('week').to_date_string()} - {today.end_of('week').to_date_string()}:\n"
-        await message.answer(
-            (text + "Overworked: " + str(overwork - underwork))
-            if overwork >= underwork
-            else (text + "Underworked: " + str(underwork - overwork)),
-        )
+    text = f"Week {today.start_of('week').to_date_string()} - {today.end_of('week').to_date_string()}:\n"
+    await message.answer(
+        (text + "Overworked: " + str(overwork - underwork))
+        if overwork >= underwork
+        else (text + "Underworked: " + str(underwork - overwork)),
+    )
 
 
 async def get_end_of_working_day(message: types.Message):
-    try:
-        gc: GoogleCalendar = message.bot[CALENDAR_KEY]
-    except KeyError:
-        await message.answer("Bot has not been started. Type: /start first.")
+    gc = await get_gcal(message)
+    today = pendulum.now()
+    day_events = tuple(
+        gc.get_events(
+            time_min=today.start_of("day"),
+            time_max=today.end_of("day"),
+            single_events=True,
+            order_by="startTime",
+        )
+    )
+    *_, last_underwork = filter(is_underwork_event, day_events)
+    *_, last_overwork = filter(is_overwork_event, day_events)
+    if get_event_length(last_overwork) == datetime.timedelta(0):
+        leave_event = last_underwork.start
     else:
-        today = pendulum.now()
-        day_events = tuple(
-            gc.get_events(
-                time_min=today.start_of("day"),
-                time_max=today.end_of("day"),
-                single_events=True,
-                order_by="startTime",
-            )
+        leave_event = last_overwork.end
+    await message.answer(
+        f"Go home scheduled on {leave_event.hour}:{leave_event.minute}"
+    )
+
+
+async def render_report(events: Iterable[Event]) -> str:
+    """Create a report from gc Events.
+
+      The report looks like:
+      ```
+      --- 2021-09-17 ---
+       start
+        07:00:00  07:00:00
+       underwork
+        15:00:00  15:00:00
+       overwork
+        15:00:00  15:00:00
+    ```
+    """
+    res = ""
+    current_date: Optional[datetime.date] = None
+    for event in sorted(events, key=lambda event: event.start):
+        if event.start.date() != current_date:
+            res += f"\n\n --- {event.start.date()} ---\n"
+            current_date = event.start.date()
+        res += f"\t{event.summary}\n\t\t{event.start.time()}\t\t{event.end.time()}\n"
+    return res
+
+
+async def get_week_details(message: types.Message):
+    gc = await get_gcal(message)
+    today = pendulum.now()
+    week_events = tuple(
+        gc.get_events(
+            time_min=today.start_of("week"),
+            time_max=today.end_of("week"),
+            single_events=True,
+            order_by="startTime",
         )
-        *_, last_underwork = filter(is_underwork_event, day_events)
-        *_, last_overwork = filter(is_overwork_event, day_events)
-        if get_event_length(last_overwork) == datetime.timedelta(0):
-            leave_event = last_underwork.start
-        else:
-            leave_event = last_overwork.end
-        await message.answer(
-            f"Go home scheduled on {leave_event.hour}:{leave_event.minute}"
-        )
+    )
+    events_to_report = filter(
+        lambda event: any(
+            key.match(event.summary) for key in WEEK_DETAILS_KEYS
+        ),
+        week_events,
+    )
+    await message.answer(
+        await render_report(events_to_report),
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
 
 def build_dispatcher() -> Dispatcher:
@@ -158,4 +210,5 @@ def build_dispatcher() -> Dispatcher:
     dp.register_message_handler(
         get_end_of_working_day, commands=("when-go-home",)
     )
+    dp.register_message_handler(get_week_details, commands=("week-details",))
     return dp
