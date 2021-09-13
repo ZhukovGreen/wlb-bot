@@ -146,9 +146,7 @@ async def get_end_of_working_day(message: types.Message):
         leave_event = last_underwork.start
     else:
         leave_event = last_overwork.end
-    await message.answer(
-        f"Go home scheduled on {leave_event.hour}:{leave_event.minute}"
-    )
+    await message.answer(f"Go home scheduled on {leave_event.time()}")
 
 
 async def render_report(events: Iterable[Event]) -> str:
