@@ -4,7 +4,7 @@ services:
     build:
       context: .
       cache_from:
-        - &img_tag aiohttp-cache:latest
+        - &img_tag wlb_bot:latest
     restart: always
     image: *img_tag
     command: python -m wlb_bot
