@@ -4,7 +4,8 @@ Simple bot helps you track your time balance.
 
 ## The principle
 
-You have a google calendar where you keep track your
+You have a google calendar where you keep track of your presence at work.
+Based on the config, the bot calculates a time balance for you.
 
 
 ## Authenticating the google calendar
