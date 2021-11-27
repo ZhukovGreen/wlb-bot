@@ -6,7 +6,6 @@ from typing import Iterable, Optional, Tuple
 import pendulum
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode
 from envparse import env
 from gcsa.event import Event
 from gcsa.google_calendar import GoogleCalendar
@@ -25,7 +24,7 @@ WEEK_DETAILS_KEYS = tuple(
 async def get_gcal(message: types.Message) -> GoogleCalendar:
     try:
         return message.bot[CALENDAR_KEY]
-    except KeyError:
+    except KeyError:  # pragma: no cover
         await message.answer("Bot has not been started. Type: /start first.")
 
 
@@ -101,7 +100,7 @@ def get_event_length(event: Event) -> datetime.timedelta:
     return event.end - event.start
 
 
-async def start(message: types.Message):
+async def start(message: types.Message) -> None:
     """Start command handler.
 
     If user is admin, then the command authenticate the google calendar.
@@ -116,7 +115,7 @@ async def start(message: types.Message):
     )
 
 
-async def get_weekly_data(message: types.Message):
+async def get_weekly_data(message: types.Message) -> None:
     gc = await get_gcal(message)
     today = pendulum.now()
     underwork, overwork = await get_balance(today, gc)
@@ -129,7 +128,7 @@ async def get_weekly_data(message: types.Message):
     )
 
 
-async def get_end_of_working_day(message: types.Message):
+async def get_end_of_working_day(message: types.Message) -> None:
     gc = await get_gcal(message)
     today = pendulum.now()
     day_events = tuple(
@@ -140,13 +139,18 @@ async def get_end_of_working_day(message: types.Message):
             order_by="startTime",
         )
     )
-    *_, last_underwork = filter(is_underwork_event, day_events)
-    *_, last_overwork = filter(is_overwork_event, day_events)
-    if get_event_length(last_overwork) == datetime.timedelta(0):
-        leave_event = last_underwork.start
+    try:
+        *_, last_underwork = filter(is_underwork_event, day_events)
+        *_, last_overwork = filter(is_overwork_event, day_events)
+    except ValueError:
+        await message.answer("No data for today.")
     else:
-        leave_event = last_overwork.end
-    await message.answer(f"Go home scheduled on {leave_event.time()}")
+        if get_event_length(last_overwork) == datetime.timedelta(0):
+            leave_event = last_underwork.start
+        # TODO cover this else by tests
+        else:  # pragma: no cover
+            leave_event = last_overwork.end
+        await message.answer(f"Go home scheduled on {leave_event.time()}")
 
 
 async def render_report(events: Iterable[Event]) -> str:
@@ -173,7 +177,7 @@ async def render_report(events: Iterable[Event]) -> str:
     return res
 
 
-async def get_week_details(message: types.Message):
+async def get_week_details(message: types.Message) -> None:
     gc = await get_gcal(message)
     today = pendulum.now()
     week_events = tuple(
@@ -192,7 +196,6 @@ async def get_week_details(message: types.Message):
     )
     await message.answer(
         await render_report(events_to_report),
-        parse_mode=ParseMode.MARKDOWN,
     )
 
 
@@ -203,10 +206,20 @@ def build_dispatcher() -> Dispatcher:
 
     bot[CALENDAR_KEY] = auth_to_gcal()
 
-    dp.register_message_handler(start, commands=("start",))
-    dp.register_message_handler(get_weekly_data, commands=("week-data",))
     dp.register_message_handler(
-        get_end_of_working_day, commands=("when-go-home",)
+        start,
+        commands=("start",),
     )
-    dp.register_message_handler(get_week_details, commands=("week-details",))
+    dp.register_message_handler(
+        get_weekly_data,
+        commands=("week-data",),
+    )
+    dp.register_message_handler(
+        get_end_of_working_day,
+        commands=("when-go-home",),
+    )
+    dp.register_message_handler(
+        get_week_details,
+        commands=("week-details",),
+    )
     return dp
